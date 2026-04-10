@@ -9,7 +9,8 @@ COPY pyproject.toml uv.lock* ./
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-# Copy packages needed by execution service
+# Copy alembic config and packages needed by execution service
+COPY alembic.ini .
 COPY packages/shared packages/shared
 COPY packages/alpaca_client packages/alpaca_client
 COPY services/execution services/execution
