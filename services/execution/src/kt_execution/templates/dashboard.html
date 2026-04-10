@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kronos Trader</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --blue: #58a6ff;
+      --orange: #d18616;
+      --purple: #bc8cff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 20px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 26px; font-weight: 600; }
+    header h1 span { color: var(--purple); }
+    #refresh-info { color: var(--text-muted); font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .big-number { font-size: 28px; font-weight: 700; }
+    .pnl-positive { color: var(--green); }
+    .pnl-negative { color: var(--red); }
+    .pnl-neutral { color: var(--text-muted); }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+    .badge-red { background: rgba(248, 81, 73, 0.15); color: var(--red); }
+    .badge-yellow { background: rgba(210, 153, 34, 0.15); color: var(--yellow); }
+    .badge-blue { background: rgba(88, 166, 255, 0.15); color: var(--blue); }
+
+    /* Progress bars */
+    .progress-bar {
+      background: var(--border);
+      border-radius: 4px;
+      height: 8px;
+      margin: 4px 0 8px;
+      overflow: hidden;
+    }
+    .progress-bar .fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+    .fill-safe { background: var(--green); }
+    .fill-warn { background: var(--yellow); }
+    .fill-danger { background: var(--red); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    /* Kill switch */
+    .kill-switch-form { display: flex; gap: 8px; align-items: center; }
+    .kill-switch-form input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 4px;
+      flex: 1;
+    }
+    .btn {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-success { background: var(--green); color: white; }
+
+    /* Confidence heatmap */
+    .heatmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 4px; }
+    .heatmap-cell {
+      padding: 8px 4px;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Chart container */
+    .chart-container { position: relative; height: 250px; }
+    .chart-filters { display: flex; gap: 4px; margin-bottom: 8px; }
+    .chart-filters button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .chart-filters button.active {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .full-width { grid-column: 1 / -1; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .label { color: var(--text-muted); font-size: 13px; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1><span>K</span>ronos Trader</h1>
+      <span class="label">Algorithmic Trading Dashboard</span>
+    </div>
+    <div id="refresh-info">
+      <span class="status-badge badge-green">HEALTHY</span>
+      &nbsp; Auto-refresh in <span id="countdown">30</span>s
+    </div>
+  </header>
+
+  <!-- Account Summary -->
+  <div class="grid-3">
+    <div class="card">
+      <h2>Cash Balance</h2>
+      <div class="big-number" id="cash">${{ "%.2f"|format(account.cash|default(0)) }}</div>
+    </div>
+    <div class="card">
+      <h2>Portfolio Value</h2>
+      <div class="big-number" id="portfolio-value">${{ "%.2f"|format(account.portfolio_value|default(0)) }}</div>
+    </div>
+    <div class="card">
+      <h2>Total P&L</h2>
+      {% set pnl = total_pnl|default(0) %}
+      <div class="big-number {{ 'pnl-positive' if pnl > 0 else 'pnl-negative' if pnl < 0 else 'pnl-neutral' }}" id="total-pnl">
+        {{ "+" if pnl > 0 else "" }}${{ "%.2f"|format(pnl) }}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- P&L Chart -->
+    <div class="card full-width">
+      <h2>Cumulative P&L</h2>
+      <div class="chart-filters">
+        <button class="active" onclick="filterChart('all')">ALL</button>
+        <button onclick="filterChart('1m')">1M</button>
+        <button onclick="filterChart('1w')">1W</button>
+        <button onclick="filterChart('1d')">1D</button>
+      </div>
+      <div class="chart-container">
+        <canvas id="pnlChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Risk Dashboard -->
+    <div class="card">
+      <h2>Risk Utilization</h2>
+      {% set rs = risk_status %}
+      <div class="status-row">
+        <span class="label">Position Exposure</span>
+        <span>${{ "%.0f"|format(rs.current_position_dollars) }} / ${{ rs.max_position_dollars }}</span>
+      </div>
+      <div class="progress-bar">
+        {% set pu = rs.position_utilization * 100 %}
+        <div class="fill {{ 'fill-safe' if pu < 60 else 'fill-warn' if pu < 85 else 'fill-danger' }}" style="width: {{ pu }}%"></div>
+      </div>
+
+      <div class="status-row">
+        <span class="label">Daily Loss</span>
+        <span>${{ "%.0f"|format(rs.current_daily_loss_dollars) }} / ${{ rs.max_daily_loss_dollars }}</span>
+      </div>
+      <div class="progress-bar">
+        {% set lu = rs.loss_utilization * 100 %}
+        <div class="fill {{ 'fill-safe' if lu < 60 else 'fill-warn' if lu < 85 else 'fill-danger' }}" style="width: {{ lu }}%"></div>
+      </div>
+
+      <div class="status-row">
+        <span class="label">Crypto Allocation</span>
+        <span>{{ "%.0f"|format(rs.crypto_allocation_pct * 100) }}% / {{ "%.0f"|format(rs.max_crypto_pct * 100) }}%</span>
+      </div>
+      <div class="progress-bar">
+        {% set cp = rs.crypto_allocation_pct / rs.max_crypto_pct * 100 if rs.max_crypto_pct > 0 else 0 %}
+        <div class="fill {{ 'fill-safe' if cp < 60 else 'fill-warn' if cp < 85 else 'fill-danger' }}" style="width: {{ cp }}%"></div>
+      </div>
+
+      <div class="status-row">
+        <span class="label">Worst Concentration</span>
+        <span>{{ rs.worst_concentration_symbol or 'N/A' }} ({{ "%.0f"|format(rs.worst_concentration_pct * 100) }}%)</span>
+      </div>
+    </div>
+
+    <!-- Kill Switch -->
+    <div class="card">
+      <h2>Kill Switch</h2>
+      {% if kill_switch.is_active %}
+        <div style="margin-bottom: 12px;">
+          <span class="status-badge badge-red">ACTIVE</span>
+          <span class="label" style="margin-left: 8px;">{{ kill_switch.activated_reason }}</span>
+        </div>
+        <form method="post" action="/dashboard/kill-switch" class="kill-switch-form">
+          <input type="hidden" name="action" value="deactivate">
+          <button type="submit" class="btn btn-success">Deactivate</button>
+        </form>
+      {% else %}
+        <div style="margin-bottom: 12px;">
+          <span class="status-badge badge-green">INACTIVE</span>
+        </div>
+        <form method="post" action="/dashboard/kill-switch" class="kill-switch-form">
+          <input type="hidden" name="action" value="activate">
+          <input type="text" name="reason" placeholder="Reason...">
+          <button type="submit" class="btn btn-danger" onclick="return confirm('Activate kill switch?')">Activate</button>
+        </form>
+      {% endif %}
+
+      <div style="margin-top: 16px;">
+        <h2>Model Accuracy</h2>
+        <div class="status-row">
+          <span class="label">Predictions Evaluated</span>
+          <span>{{ accuracy.count|default(0) }}</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Direction Accuracy</span>
+          <span>{{ "%.1f"|format((accuracy.direction_accuracy or 0) * 100) }}%</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Mean Abs Error</span>
+          <span>{{ "%.3f"|format(accuracy.mean_error or 0) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Positions Table -->
+  <div class="card" style="margin-bottom: 24px;">
+    <h2>Open Positions</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Class</th>
+          <th>Side</th>
+          <th>Qty</th>
+          <th>Avg Price</th>
+          <th>Current</th>
+          <th>Value</th>
+          <th>P&L</th>
+        </tr>
+      </thead>
+      <tbody id="positions-body">
+        {% for p in positions %}
+        <tr>
+          <td><strong>{{ p.symbol }}</strong></td>
+          <td><span class="status-badge badge-blue">{{ p.asset_class|upper }}</span></td>
+          <td>{{ p.side|upper }}</td>
+          <td>{{ "%.4f"|format(p.quantity) }}</td>
+          <td>${{ "%.2f"|format(p.avg_entry_price) }}</td>
+          <td>${{ "%.2f"|format(p.current_price) }}</td>
+          <td>${{ "%.2f"|format(p.market_value) }}</td>
+          <td class="{{ 'pnl-positive' if p.unrealized_pnl > 0 else 'pnl-negative' if p.unrealized_pnl < 0 else '' }}">
+            {{ "+" if p.unrealized_pnl > 0 else "" }}${{ "%.2f"|format(p.unrealized_pnl) }}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not positions %}
+        <tr><td colspan="8" class="label" style="text-align:center;">No open positions</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid">
+    <!-- Signal Strength -->
+    <div class="card">
+      <h2>Recent Signals</h2>
+      <table>
+        <thead>
+          <tr><th>Symbol</th><th>Side</th><th>Edge</th><th>Conf</th><th>Return</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for s in signals %}
+          <tr>
+            <td><strong>{{ s.symbol }}</strong></td>
+            <td class="{{ 'pnl-positive' if s.side == 'buy' else 'pnl-negative' }}">{{ s.side|upper }}</td>
+            <td>{{ "%.2f"|format(s.net_edge * 100) }}%</td>
+            <td>{{ "%.0f"|format(s.confidence * 100) }}%</td>
+            <td>{{ "%.2f"|format(s.expected_return * 100) }}%</td>
+            <td><span class="status-badge {{ 'badge-green' if s.status == 'traded' else 'badge-yellow' }}">{{ s.status }}</span></td>
+          </tr>
+          {% endfor %}
+          {% if not signals %}
+          <tr><td colspan="6" class="label" style="text-align:center;">No signals yet</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Predictions vs Actuals -->
+    <div class="card">
+      <h2>Predictions vs Actuals</h2>
+      <table>
+        <thead>
+          <tr><th>Symbol</th><th>TF</th><th>Predicted</th><th>Actual</th><th>Error</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+          {% for p in predictions %}
+          <tr>
+            <td><strong>{{ p.symbol }}</strong></td>
+            <td>{{ p.timeframe }}</td>
+            <td>${{ "%.2f"|format(p.predicted_close_mean) }}</td>
+            <td>{{ "$%.2f"|format(p.actual_close) if p.actual_close else "---" }}</td>
+            <td>
+              {% if p.actual_close %}
+                {% set err = ((p.actual_close - p.predicted_close_mean) / p.current_price * 100) %}
+                <span class="{{ 'pnl-positive' if err|abs < 1 else 'pnl-negative' }}">{{ "%.2f"|format(err) }}%</span>
+              {% else %}
+                <span class="label">pending</span>
+              {% endif %}
+            </td>
+            <td class="label">{{ p.predicted_at[:16] }}</td>
+          </tr>
+          {% endfor %}
+          {% if not predictions %}
+          <tr><td colspan="6" class="label" style="text-align:center;">No predictions yet</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Trades -->
+  <div class="card" style="margin-bottom: 24px;">
+    <h2>Recent Trades</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Class</th>
+          <th>Side</th>
+          <th>Qty</th>
+          <th>Value</th>
+          <th>Edge</th>
+          <th>Conf</th>
+          <th>Status</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trades %}
+        <tr>
+          <td><strong>{{ t.symbol }}</strong></td>
+          <td><span class="status-badge badge-blue">{{ t.asset_class|upper }}</span></td>
+          <td class="{{ 'pnl-positive' if t.side == 'buy' else 'pnl-negative' }}">{{ t.side|upper }}</td>
+          <td>{{ "%.4f"|format(t.quantity) }}</td>
+          <td>${{ "%.2f"|format(t.notional_value) }}</td>
+          <td>{{ "%.2f"|format(t.expected_return * 100) }}%</td>
+          <td>{{ "%.0f"|format(t.confidence * 100) }}%</td>
+          <td>
+            <span class="status-badge {{ 'badge-green' if t.status == 'accepted' else 'badge-red' if t.status == 'rejected' else 'badge-yellow' }}">
+              {{ t.status }}
+            </span>
+          </td>
+          <td class="label">{{ t.requested_at[:16] if t.requested_at else '' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not trades %}
+        <tr><td colspan="9" class="label" style="text-align:center;">No trades yet</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Audit Log -->
+  <div class="card">
+    <h2>Audit Log</h2>
+    <table>
+      <thead>
+        <tr><th>Event</th><th>Request ID</th><th>Details</th><th>Time</th></tr>
+      </thead>
+      <tbody>
+        {% for e in (audit_entries if audit_entries is defined else []) %}
+        <tr>
+          <td><span class="status-badge badge-blue">{{ e.event_type }}</span></td>
+          <td class="label">{{ (e.request_id|string)[:8] if e.request_id else '' }}...</td>
+          <td class="label">{{ e.details|tojson|truncate(80) }}</td>
+          <td class="label">{{ e.created_at.isoformat()[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // P&L Chart
+    const pnlData = {{ pnl_chart|tojson }};
+    const ctx = document.getElementById('pnlChart').getContext('2d');
+    let pnlChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: pnlData.labels.map(l => l.slice(5, 16)),
+        datasets: [{
+          label: 'P&L ($)',
+          data: pnlData.values,
+          borderColor: '#58a6ff',
+          backgroundColor: 'rgba(88, 166, 255, 0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8b949e', maxTicksLimit: 10 }, grid: { color: '#30363d' } },
+          y: { ticks: { color: '#8b949e', callback: v => '$' + v.toFixed(0) }, grid: { color: '#30363d' } }
+        }
+      }
+    });
+
+    function filterChart(range) {
+      document.querySelectorAll('.chart-filters button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      let n = pnlData.labels.length;
+      if (range === '1d') n = Math.min(n, 24);
+      else if (range === '1w') n = Math.min(n, 168);
+      else if (range === '1m') n = Math.min(n, 720);
+      pnlChart.data.labels = pnlData.labels.slice(-n).map(l => l.slice(5, 16));
+      pnlChart.data.datasets[0].data = pnlData.values.slice(-n);
+      pnlChart.update();
+    }
+
+    // Auto-refresh
+    let countdown = 30;
+    const countdownEl = document.getElementById('countdown');
+    setInterval(() => {
+      countdown--;
+      countdownEl.textContent = countdown;
+      if (countdown <= 0) {
+        countdown = 30;
+        fetch('/dashboard/data')
+          .then(r => r.json())
+          .then(data => {
+            document.getElementById('cash').textContent = '$' + parseFloat(data.account.cash).toFixed(2);
+            document.getElementById('portfolio-value').textContent = '$' + parseFloat(data.account.portfolio_value).toFixed(2);
+            const pnl = parseFloat(data.total_pnl);
+            const pnlEl = document.getElementById('total-pnl');
+            pnlEl.textContent = (pnl > 0 ? '+' : '') + '$' + pnl.toFixed(2);
+            pnlEl.className = 'big-number ' + (pnl > 0 ? 'pnl-positive' : pnl < 0 ? 'pnl-negative' : 'pnl-neutral');
+          })
+          .catch(err => console.error('Refresh failed:', err));
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

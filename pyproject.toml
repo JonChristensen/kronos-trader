@@ -1,0 +1,36 @@
+[project]
+name = "kronos-trader"
+version = "0.1.0"
+description = "Algorithmic trading system powered by the Kronos financial foundation model"
+requires-python = ">=3.12"
+
+[tool.uv.workspace]
+members = [
+    "packages/shared",
+    "packages/alpaca_client",
+    "packages/kronos_model",
+    "packages/signal_engine",
+    "services/agent",
+    "services/execution",
+]
+
+[tool.uv.sources]
+kt-shared = { workspace = true }
+kt-alpaca = { workspace = true }
+kt-kronos = { workspace = true }
+kt-signal = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
+    "respx>=0.21",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires external services (PostgreSQL, etc.)",
+    "e2e: end-to-end tests requiring Alpaca paper trading account",
+]

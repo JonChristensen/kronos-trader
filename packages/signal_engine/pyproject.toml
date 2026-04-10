@@ -1,0 +1,8 @@
+[project]
+name = "kt-signal"
+version = "0.1.0"
+description = "Signal generation engine: edge calculation, confidence scoring, position sizing"
+requires-python = ">=3.12"
+dependencies = [
+    "kt-shared",
+]

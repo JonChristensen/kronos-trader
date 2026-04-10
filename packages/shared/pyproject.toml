@@ -1,0 +1,10 @@
+[project]
+name = "kt-shared"
+version = "0.1.0"
+description = "Shared configuration, constants, and models for Kronos Trader"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "structlog>=24.0",
+]

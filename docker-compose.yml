@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kt
+      POSTGRES_PASSWORD: kt
+      POSTGRES_DB: kt_execution
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kt"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  execution:
+    build:
+      context: .
+      dockerfile: Dockerfile.execution
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      EXEC_DATABASE_URL: postgresql+asyncpg://kt:kt@postgres:5432/kt_execution
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    env_file: .env
+    environment:
+      AGENT_EXECUTION_SERVICE_URL: http://execution:8001
+      KRONOS_DEVICE: cpu
+    depends_on:
+      execution:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pgdata:

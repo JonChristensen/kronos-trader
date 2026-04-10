@@ -1,0 +1,24 @@
+FROM nvidia/cuda:12.1.0-base-ubuntu22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 python3.12-venv python3-pip git curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+COPY pyproject.toml uv.lock* ./
+
+COPY packages/shared packages/shared
+COPY packages/alpaca_client packages/alpaca_client
+COPY packages/kronos_model packages/kronos_model
+COPY packages/signal_engine packages/signal_engine
+COPY services/agent services/agent
+
+RUN uv sync --frozen --package kt-agent 2>/dev/null || uv sync --package kt-agent
+
+# Pre-download Kronos model weights during build
+RUN /app/.venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('NeoQuasar/Kronos-small')" || true
+
+CMD ["/app/.venv/bin/python", "-m", "kt_agent.main"]
