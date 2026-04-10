@@ -16,7 +16,15 @@ COPY packages/kronos_model packages/kronos_model
 COPY packages/signal_engine packages/signal_engine
 COPY services/agent services/agent
 
-# Install dependencies (includes PyTorch for CPU)
-RUN uv sync --frozen --package kt-agent 2>/dev/null || uv sync --package kt-agent
+# Install all packages into venv
+RUN uv venv && \
+    uv pip install \
+      ./packages/shared \
+      ./packages/alpaca_client \
+      ./packages/kronos_model \
+      ./packages/signal_engine \
+      ./services/agent
 
-CMD ["/app/.venv/bin/python", "-m", "kt_agent.main"]
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["python", "-m", "kt_agent.main"]

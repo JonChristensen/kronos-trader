@@ -15,10 +15,17 @@ COPY packages/shared packages/shared
 COPY packages/alpaca_client packages/alpaca_client
 COPY services/execution services/execution
 
-# Install dependencies
-RUN uv sync --frozen --package kt-execution 2>/dev/null || uv sync --package kt-execution
+# Install all packages into venv
+RUN uv venv && \
+    uv pip install \
+      ./packages/shared \
+      ./packages/alpaca_client \
+      ./services/execution \
+      alembic asyncpg
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8001
 
 ENTRYPOINT ["./entrypoint.sh"]
-CMD ["/app/.venv/bin/python", "-m", "uvicorn", "kt_execution.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "kt_execution.main:app", "--host", "0.0.0.0", "--port", "8001"]
