@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_rds as rds,
     aws_secretsmanager as sm,
     aws_elasticloadbalancingv2 as elbv2,
+    aws_elasticloadbalancingv2_targets as targets,
 )
 
 
@@ -31,10 +32,10 @@ class ComputeStack(cdk.Stack):
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(8001), "Dashboard")
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "SSH")
 
-        # Allow instance to connect to RDS
+        # Allow EC2 instance to connect to RDS — one-directional dependency
         db_instance.connections.allow_default_port_from(sg)
 
-        # IAM role for EC2
+        # IAM role for EC2 — use inline policy to avoid cyclic grant_read
         role = iam.Role(
             self,
             "KtInstanceRole",
@@ -45,23 +46,36 @@ class ComputeStack(cdk.Stack):
                 ),
             ],
         )
-        db_secret.grant_read(role)
-        app_secret.grant_read(role)
+        # Grant access to secrets via inline policy (avoids cross-stack cyclic ref)
+        role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["secretsmanager:GetSecretValue"],
+                resources=[
+                    f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:kt/*",
+                    f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:KtData*",
+                ],
+            )
+        )
 
-        # User data: install Docker and start services
+        # User data: install Docker, docker-compose, NVIDIA drivers
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
             "yum update -y",
             "yum install -y docker git",
             "systemctl enable docker && systemctl start docker",
             "usermod -aG docker ec2-user",
-            # Install docker-compose
-            'curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose',
-            "chmod +x /usr/local/bin/docker-compose",
+            # Install docker-compose v2
+            'mkdir -p /usr/local/lib/docker/cli-plugins',
+            'curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose',
+            'chmod +x /usr/local/lib/docker/cli-plugins/docker-compose',
+            'ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose',
             # Install NVIDIA driver and container toolkit for GPU
-            "yum install -y kernel-devel-$(uname -r)",
-            "amazon-linux-extras install -y nvidia",
-            "yum install -y nvidia-container-toolkit",
+            "yum install -y kernel-devel-$(uname -r) || true",
+            "amazon-linux-extras install -y nvidia || true",
+            # NVIDIA container toolkit repo + install
+            'curl -fsSL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | tee /etc/yum.repos.d/nvidia-container-toolkit.repo',
+            "yum install -y nvidia-container-toolkit || true",
+            "nvidia-ctk runtime configure --runtime=docker || true",
             "systemctl restart docker",
         )
 
@@ -100,7 +114,7 @@ class ComputeStack(cdk.Stack):
 
         listener = alb.add_listener("KtListener", port=80)
 
-        target = elbv2.InstanceTarget(
+        target = targets.InstanceIdTarget(
             instance_id=self.instance.instance_id,
             port=8001,
         )
@@ -108,6 +122,7 @@ class ComputeStack(cdk.Stack):
         listener.add_targets(
             "KtTargets",
             port=8001,
+            protocol=elbv2.ApplicationProtocol.HTTP,
             targets=[target],
             health_check=elbv2.HealthCheck(path="/api/v1/health"),
         )

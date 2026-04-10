@@ -46,3 +46,9 @@ class DataStack(cdk.Stack):
                 generate_string_key="exec_auth_token",
             ),
         )
+
+        # Export values so compute stack can reference without creating cyclic deps
+        cdk.CfnOutput(self, "DbEndpoint", value=self.db_instance.db_instance_endpoint_address)
+        cdk.CfnOutput(self, "DbPort", value=self.db_instance.db_instance_endpoint_port)
+        cdk.CfnOutput(self, "DbSecretArn", value=self.db_secret.secret_arn)
+        cdk.CfnOutput(self, "AppSecretArn", value=self.app_secret.secret_arn)
