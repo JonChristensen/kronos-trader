@@ -178,7 +178,7 @@ async def dashboard_page(
     request: Request, session: AsyncSession = Depends(get_session)
 ) -> HTMLResponse:
     data = await _gather_dashboard_data(session)
-    return templates.TemplateResponse("dashboard.html", {"request": request, **data})
+    return templates.TemplateResponse(request, "dashboard.html", context=data)
 
 
 @dashboard_router.get("/dashboard/data")
@@ -200,4 +200,4 @@ async def dashboard_kill_switch_toggle(
         await deactivate_kill_switch(session)
 
     data = await _gather_dashboard_data(session)
-    return templates.TemplateResponse("dashboard.html", {"request": request, **data})
+    return templates.TemplateResponse(request, "dashboard.html", context=data)
